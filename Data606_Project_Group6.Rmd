@@ -1,0 +1,909 @@
+---
+title: "Diabetes Prediction Models Analysis"
+author:
+- Shubham Bansal, Nidhika Bhoria, Jessica Chau,
+- Harman Kaur, Maya Schuller
+date: '2022-02-20'
+output:
+  word_document:
+    toc: yes
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+  pdf_document:
+    extra_dependencies:
+    - bbm
+    - xcolor
+    toc: yes
+subtitle: Group-6, DATA 606 Final Project Report
+---
+
+```{r, setup, echo = FALSE, message = FALSE }
+library(survey)
+library(truncnorm)
+library(data.table)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(tinytex)
+library(car)
+library(sampling)
+library(MASS)
+library(klaR)
+library(caTools)
+library(dplyr)
+library(questionr)
+
+raw_data = read.csv(file="diabetes_dataset__2019.csv", header = TRUE)
+data = raw_data
+```
+
+\pagebreak
+# 1 Introduction
+
+Diabetes is a chronic disease that has become increasingly prevalent in many countries around the world. According to the World Health Organization (WHO), 'diabetes was the ninth leading cause of death with an estimated 1.5 million deaths directly caused by diabetes [in 2019]'. Between 2000-2016, the probability of dying from one of the 4 main noncommunicable diseases (cardiovascular diseases, cancer, chronic respiratory diseases or diabetes) between the ages of 30-70 decreased by 18% globally. Over the same period of time, there was an increase in premature mortality rate (death before age 70) due to diabetes. (World Health Organization, 2021)
+
+There are three main types of diabetes:
+  + Type 1: The body makes little to no insulin
+  + Type 2: The body is unable to use insulin it makes properly
+  + Gestational diabetes: Similar to type 2 (body is unable to properly use insulin) but specific to during pregnancy, typically goes away post pregnancy.  
+
+Common symptoms for all types of diabetes include frequent urination, constant thirst/hunger, weight loss, vision changes, and fatigue. 
+
+Type 1 diabetes is unpreventable and less common than Type 2. The cause and cure for Type 1 diabetes are unknown and people with Type 1 diabetes depend on insulin to stay alive. In comparison, 95% of people with diabetes have Type 2. Type 2 diabetes is often a result of excess body weight and physical inactivity from lifestyle. There are many risk factors associated with Type 2 diabetes including increased risk for 
+  + heart attacks and stroke
+  + damage to heart, blood vessels, eyes, kidneys and nerves
+  + reduced blood flow limbs resulting in limb amputation
+
+There are several risk factors for Type 2 diabetes as well as lifestyle choices that can help prevent or postpone Type 2 diabetes. For these reasons, the research paper used for this analysis focuses on predicting Type 2 diabetes in India. This type of research can be useful in providing insights to help prevent Type 2 diabetes. In Canada, nine out of ten people with diabetes have Type 2 diabetes. The Government of Canada developed the Canadian Diabetes Strategy in 1999 with 4 major goals related to education, prevention and care for diabetes (Government of Canada, 2019). 
+
+The analysis completed investigates various predictors for Type 2 diabetes. 
+
+
+# 2 Data
+## 2.1 Data source
+The data used for this analysis was posted on Kaggle, an open public data base. The data was collected for the study *Prediction of Type 2 Diabetes using Machine Learning Classification Methods*. The authors of the paper are Neha Prerna Tiggaa and Shruti Garga of the Department of Computer Science and Engineering at the Birla Institute of Technology in India. Published in 2020, their research investigates predictors of Type 2 diabetes. The data was collected via questionnaire of 947 respondents in India.    
+
+
+## 2.2 Variable Explanations
+From the survey results, there are 17 independent predictor variables for the dependent condition Diabetes. The 13 categorical and 4 quantitative explanatory variables featured in the data set are described below: 
+
+
+**Categorical Variables** 
+
+All non-binary categories were converted to numerical values in order to create a relative order for analysis.  
+
+  1. Age
+      + Value 0: less than 40
+      + Value 1: 40-49
+      + Value 2: 50-59
+      + Value 3: 60 or older
+  2. Gender (Male/Female) 
+  3. Family_Diabetes: family history of diabetes (Yes/No) 
+  4. highBP: diagnosed with high blood pressure (Yes/No)
+  5. PhysicallyActive: 
+      + Value 0: none
+      + Value 1: less than half an hr
+      + Value 2: more than half an hr
+      + Value 3: one hr or more
+  6. Smoking (Yes/No)
+  7. Alcohol (Yes/No)
+  8. RegularMedicine (Yes/No)
+  9. JunkFood: 
+      + Value 0: occasionally
+      + Value 1: often
+      + Value 2: very often
+      + Value 3: always
+  10. Stress
+      + Value 0: not at all
+      + Value 1: sometimes
+      + Value 2: very often
+      + Value 3: always
+  11. BPLevel: Blood pressure level
+      + Value 0: low
+      + Value 1: normal
+      + Value 2: high
+  12. Pdiabetes: gestational diabetes is a condition frequently experienced during pregnancy
+      + Value 0: 0
+      + Value 1: yes
+      + Value 2: no
+  13. UriationFreq: Urination frequency (not much/quite often)
+    
+**Quantitative Variables**  
+
+The range of numeric values included in the data set is listed in parenthesis for each predictor.
+
+  14. BMI: body mass index (15-45)
+  15. Sleep: hours of sleep per night (4-11 hours)
+  16. SoundSleep: hours of sound sleep per night (0-11 hours)
+  17. Pregnancies: number of pregnancies (0-4)
+
+## 2.3 Data limitations 
+The dataset includes responses from 952 surveys. The survey included questions related to family history, lifestyle and health. As with any data set, there are a few limitations with the data collected. Several of the questions were limited to Yes/No despite the potential for a larger range of responses. Additionally, there were relatively few details in the summary table of questions is provided. 
+
+Categories 'Smoking', 'Alcohol consumption', 'Junk food consumption' 
+
+It is assumed that the 'hours of sleep' is the average hours of sleep the respondent receives each night, however; there is no explanation as to what constitutes 'hours of sound sleep' or the method for determining these values. Similarly there are no details regarding type of medication that would prompt a user to respond yes to 'regular intake of medicine'. 
+
+## 2.4 Data Cleaning  
+```{r}
+# Read in data
+data = read.csv("diabetes_dataset__2019.csv", stringsAsFactors = TRUE)
+
+# Show dimensions, names, summary
+dim(data)
+names(data)
+str(data)
+contrasts(data$Diabetic)
+```
+
+We can see that many of the predictors are read in with more levels than they should be due to multiple data entry errors and inconsistencies. For example, "Diabetic" has 4 levels where it should have 2. Our data cleaning focuses on fixing these issues.
+
+```{r}
+# Clean data
+
+## Clean "Diabetic" column
+data = data[data$Diabetic != "",] # remove missing values
+data$Diabetic[data$Diabetic == " no"] = "no" # fix whitespace
+## Clean "RegularMedicine" column
+data$RegularMedicine[data$RegularMedicine == "o"] = "no" # fix data entry
+## Clean "BPLevel" column
+data$BPLevel[data$BPLevel == "High"] = "high" # fix data entry
+data$BPLevel[data$BPLevel == "Low"] = "low" # fix data entry
+data$BPLevel[data$BPLevel == "normal "] = "normal" # fix data entry
+## Clean "Pdiabetes" column
+data$Pdiabetes[data$Pdiabetes == "0"] = "no" # convert 0 to "no"
+data = data[data$Pdiabetes != "",] # remove missing values
+## Clean "Pregancies" column
+data$Pregancies[is.na(data$Pregancies)] = 0 # replace missing values to 0
+
+# Export to csv
+write.csv(data, file = "diabetes.csv", row.names = FALSE)
+
+# Re-read in data
+data = read.csv("diabetes.csv", stringsAsFactors = TRUE)
+
+# Show dimensions, names, summary
+dim(data)
+names(data)
+str(data)
+contrasts(data$Diabetic)
+```
+
+After cleaning, we see that the data is properly formatted with the appropriate levels for each qualitative predictor. We can now move forward with our analysis.
+
+Remove null & NA values
+```{r }
+#data <- data[!(is.na(data$Diabetic) | data$Diabetic=="" | is.na(data$BMI) | data$BMI==""|is.na(data$Pdiabetes) | data$Pdiabetes=="" |is.na(data$Pregnancies) | data$Pregnancies==""),]
+num_rows = dim(data)[1]
+```
+The dataset includes `r num_rows` rows after dropping that contain null values.
+
+Convert categories to numerical values as per 'the 'Variable Explanations' 
+```{r }
+#data$Age <- sapply(as.character(data$Age), switch, "less than 40" = 0, "40-49" = 1, "50-59" = 2, "60 or older" = 3)
+
+#data$PhysicallyActive <- sapply(as.character(data$PhysicallyActive), switch, "none" = 0, "less than half an hr" = 1, "more than half an hr" = 2, "one hr or more" = 3)
+
+#data$JunkFood <- sapply(as.character(data$JunkFood), switch, "occasionally" = 0, "often" = 1, "very often" = 2, "always" = 3)
+
+#data$Stress <- sapply(as.character(data$Stress), switch, "not at all" = 0, "sometimes" = 1, "very often" = 2, "always" = 3)
+
+#data$BPLevel <- sapply(as.character(data$BPLevel), switch, "low" = 0, "normal" = 1,  "normal " = 1, "high" = 2) #"normal" and "normal "
+
+#data$Pdiabetes <- sapply(as.character(data$Pdiabetes), switch, "0" = 0, "yes" = 1, "no" = 2)
+```
+
+# 3 Exploratory Data Analysis
+## 3.1 Exploratory Data Analysis
+```{r, echo = FALSE, message = FALSE }
+require(gridExtra)
+df <- data.frame(data)
+
+Diabetic_plot <- ggplot(df, aes(x=
+Diabetic,fill = Diabetic)) +  geom_bar() 
+Diabetic_plot
+```
+There are 266 (28%) respondents  with the diabetes condition and 684 (72%) without.The following analysis will review the distribution of respondent responses as well as the distribution of responses with respect to diabetic condition. 
+
+```{r, echo = FALSE, message = FALSE }
+Gender_plot <- ggplot(df, aes(x=Gender)) +  geom_bar() 
+
+Age_positions <- c("less than 40","40-49", "50-59", "60 or older")
+Age_plot <- ggplot(df, aes(x=Age)) +  geom_bar() + scale_x_discrete(limits = Age_positions) + scale_x_discrete(limits = Age_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+Gender_plot2 <- ggplot(df,aes(x = Gender,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+Age_plot2 <- ggplot(df, aes(x=Age,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = Age_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+grid.arrange(Gender_plot, Age_plot,Gender_plot2, Age_plot2, ncol=2)
+```
+
+
+```{r, echo = FALSE, message = FALSE }
+Pregnancies_plot <- ggplot(df, aes(x=
+Pregancies)) +  geom_bar() 
+
+gest_positions <- c("0","yes", "no")
+gest_plot <- ggplot(df, aes(x=Pdiabetes)) +  geom_bar() + scale_x_discrete(limits = gest_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+Pregnancies_plot2 <- ggplot(df,aes(x = Pregancies,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+gest_plot2 <- ggplot(df, aes(x=Pdiabetes,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = gest_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+grid.arrange(Pregnancies_plot, gest_plot, Pregnancies_plot2, gest_plot2, ncol=2)
+```
+From the charts related to pregnancies, we can see that the majority of respondents had 0 pregnancies. There were only 128 women with multiple pregnancies (64 with 2, 60 with 3, and 4 with 4 pregnancies). Those surveyed with multiple pregnancies (>2) appear to have a higher proportion of diabetes than those who did not. 
+
+```{r, echo = FALSE, message = FALSE }
+Sleep_plot <- ggplot(df, aes(x=
+Sleep)) +  geom_bar() 
+
+SoundSleep_plot <- ggplot(df, aes(x=
+SoundSleep)) +  geom_bar() 
+
+Sleep_plot2 <- ggplot(df,aes(x = Sleep,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+SoundSleep_plot2 <- ggplot(df,aes(x = SoundSleep,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+grid.arrange(Sleep_plot, SoundSleep_plot,Sleep_plot2, SoundSleep_plot2, ncol=2)
+```
+The sleep question responses appear to follow a normal distribution with most respondents getting between 6-8 hours of sleep each night. Those getting significantly less sleep, ie. 4 hours, appear to have a have a higher rate of diabetes. 
+
+
+```{r, echo = FALSE, message = FALSE }
+Smoking_plot <- ggplot(df, aes(x=Smoking)) +  geom_bar() 
+
+Alcohol_plot <- ggplot(df, aes(x=Alcohol)) +  geom_bar() 
+
+Smoking_plot2 <- ggplot(df,aes(x = Smoking,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+Alcohol_plot2 <- ggplot(df,aes(x = Alcohol,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+grid.arrange(Smoking_plot, Alcohol_plot,Smoking_plot2, Alcohol_plot2, ncol=2)
+```
+The proportion of respondents who indicated yes to smoking or alcohol is relatively small (108 and 192 respectively). There does not appear to be a large difference in diabetes rate among those who smoke or consume alcohol. 
+
+```{r, echo = FALSE, message = FALSE }
+Family_plot <- ggplot(df, aes(x=Family_Diabetes)) +  geom_bar() 
+
+Medicine_plot <- ggplot(df, aes(x=
+RegularMedicine)) +  geom_bar() 
+
+Family_plot2 <- ggplot(df,aes(x = Family_Diabetes,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+Medicine_plot2 <- ggplot(df,aes(x = RegularMedicine,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+grid.arrange(Family_plot, Medicine_plot,Family_plot2, Medicine_plot2, ncol=2)
+```
+Individuals who answered yes to family diabetes history or regular medicine appear to have a higher rate of diabetes than those who answered no. 
+
+```{r, echo = FALSE, message = FALSE }
+BMI_plot <- ggplot(df, aes(x=BMI)) +  geom_bar()
+BMI_plot2 <- ggplot(df,aes(x = BMI,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+Activity_positions <- c("none","less than half an hr", "more than half an hr", "one hr or more")
+Activity_plot <- ggplot(data.frame(raw_data), aes(x=PhysicallyActive)) +  geom_bar() + scale_x_discrete(limits = Activity_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+Activity_plot2 <- ggplot(df, aes(x=PhysicallyActive,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = Activity_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+JunkFood_positions <- c("occasionally","often", "very often", "always")
+JunkFood_plot <- ggplot(data.frame(raw_data), aes(x=JunkFood)) +  geom_bar() + scale_x_discrete(limits = JunkFood_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+JunkFood_plot2 <- ggplot(df, aes(x=JunkFood,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = JunkFood_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+#grid.arrange(BMI_plot, BMI_plot2, Activity_plot , Activity_plot2,JunkFood_plot,JunkFood_plot2, ncol=2)
+grid.arrange(BMI_plot,Activity_plot,JunkFood_plot, BMI_plot2, Activity_plot2,JunkFood_plot2, ncol=3)
+```
+
+
+```{r, echo = FALSE, message = FALSE }
+BPlevel_positions <- c("low","normal", "high")
+BPlevel_plot <- ggplot(df, aes(x=BPLevel)) +  geom_bar() + scale_x_discrete(limits = BPlevel_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+highBP_plot <- ggplot(df, aes(x=highBP)) +  geom_bar() 
+
+BPlevel_plot2 <- ggplot(df, aes(x=BPLevel,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = BPlevel_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+highBP_plot2 <- ggplot(df,aes(x = highBP,fill = Diabetic)) + 
+    geom_bar(position = "fill")+ theme(legend.position = "bottom")
+
+grid.arrange(BPlevel_plot, highBP_plot, BPlevel_plot2, highBP_plot2, ncol=2)
+```
+From the blood pressure level charts, we can see that the group of respondents with higher blood pressure levels had higher proportion of diabetes. 
+
+
+```{r, echo = FALSE, message = FALSE }
+Stress_positions <- c("not at all","sometimes", "very often", "always")
+Stress_plot <- ggplot(df, aes(x=Stress)) +  geom_bar() + scale_x_discrete(limits = Stress_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+UriationFreq_positions <- c("not much","quite often")
+UriationFreq_plot <- ggplot(df, aes(x=UriationFreq)) +  geom_bar() + scale_x_discrete(limits = UriationFreq_positions,labels = function(x) str_wrap(x, width = 10)) + theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+Stress_plot2 <- ggplot(df, aes(x=Stress,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = Stress_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+UriationFreq_plot2 <- ggplot(df, aes(x=UriationFreq,fill = Diabetic)) +  geom_bar(position = "fill") + scale_x_discrete(limits = UriationFreq_positions,labels = function(x) str_wrap(x, width = 10)) + theme(legend.position = "bottom",axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1))
+
+grid.arrange(Stress_plot, UriationFreq_plot, Stress_plot2, UriationFreq_plot2, ncol=2)
+```
+
+## 3.2 Test of Independence 
+
+First we try to see any proportions between highBP and diabetes by implementing contingency table and proportional table.
+
+
+```{r}
+data$Diabetic = trimws(data$Diabetic,which = "both")
+unique(data$Diabetic)
+```
+
+
+
+```{r}
+tab1<-table(data$highBP, data$Diabetic)
+tab1
+```
+```{r}
+prop.table(tab1,margin = 1)
+```
+
+From the above proportions, we can observe that if person has no high BP problem then there are 80% chances that he or she has no diabetes.
+If person has high BP then there 60% chance that person is having diabetes problem.
+
+
+2. Test of Independence between highBP and Physically Active variable using Pearson's chi-square test.
+
+$H_o$:Both the variables are independent from each other 
+$H_{\alpha}$:both the variable are not independent from each other
+
+```{r,warning=TRUE}
+tab1 = table(data$highBP,data$PhysicallyActive)
+print(tab1)
+chisq.test(tab1)
+chisq.residuals(tab1,std = "TRUE")
+```
+
+Although we can't reject the null hypothesis as p-value = 0.06975 is greater than 0.05 but still after plotting residual plots we can see that there are significantly more person having high BP problem who is doing less than half an hr physical activity and  there are significantly less person having Bp problem if they do one hr or more physical activity. 
+
+3. Test of Independence between stress and diabetes variable using Pearson's chi-square test.
+
+$H_o$:Both the variables are independent from each other 
+$H_{\alpha}$:both the variable are not independent from each other
+```{r}
+tab1 = table(data$Stress,data$Diabetic)
+chisq.test(tab1)
+chisq.residuals(tab1,std = TRUE)
+```
+As p value is less than 0.05, we clearly reject the null hypothesis and say that stress and diabetes are not independent and we can clearly see that as stress level increase, the chances of having diabetes also increases.
+
+4. Test of Independence between Pregnancies and diabetes variable using Pearson's chi-square test.
+
+$H_o$:Both the variables are independent from each other 
+$H_{\alpha}$:both the variable are not independent from each other
+```{r, warning=FALSE}
+tab1 = table(data$Pregancies,data$Diabetic)
+chisq.test(tab1)
+chisq.residuals(tab1,std = TRUE)
+```
+As p value is less than 0.05, we clearly reject the null hypothesis and say that No of Pregnancies and diabetes are not independent and we can clearly see that as no of Pregnancies increase, the chances of having diabetes also increases.
+
+
+
+# 4 Analysis
+
+## 4.1 Logistic Regression
+
+The response variable "Diabetic" is categorical/qualitative with a binary response, so we can try a logistic regression. We will split the dataset into 75% for training data and 25% for testing data.
+
+```{r}
+# Split data into 75% training and 25% testing sets
+set.seed(10)
+idx = sample(1:nrow(data), 3/4*nrow(data))
+training = data[idx,]
+testing = data[-idx,]
+```
+
+```{r}
+# Perform logistic regression on training set
+model1 = glm(factor(Diabetic) ~ ., family = binomial, data = training)
+summary(model1)
+```
+
+```{r}
+# Apply model to testing data
+predict1 = predict(model1, testing, type = "response")
+predict_diab1 = rep("no", dim(testing)[1])
+predict_diab1[predict1 >= 0.5] = "yes"
+actual = testing$Diabetic
+table(predict_diab1, actual)
+```
+
+```{r}
+# Misclassification rate
+mean(predict_diab1 != actual)
+```
+
+We can also check the multicollinearity by finding the variance inflation factor (VIF) of the variables.
+
+```{r}
+# Check the VIF of Model 1
+vif(model1)
+```
+
+Most VIF values are below 5, therefore there does not seem to be an issue with multicollinearity with the majority of variables. However, it seems the "Age" variable has a VIF above 5, suggesting that "Age" has an issue with multicollinearity. "JunkFood" is also a bit high with a VIF around 4. We can try running the regression again without the "Age" variable.
+
+```{r}
+# Perform logistic regression on training set without Age
+model2 = glm(factor(Diabetic) ~ Gender+Family_Diabetes+highBP+PhysicallyActive+BMI
+             +Smoking+Alcohol+Sleep+SoundSleep+RegularMedicine+JunkFood+Stress
+             +BPLevel+Pregancies+Pdiabetes+UriationFreq, 
+             family = binomial, data = training)
+summary(model2)
+```
+
+```{r}
+# Check the VIF of Model 2
+vif(model2)
+```
+
+This time no variables have a VIF over 5, and the VIF of "JunkFood" has come down from the prior value.
+
+```{r}
+# Apply model to testing data
+predict2 = predict(model2, testing, type = "response")
+predict_diab2 = rep("no", dim(testing)[1])
+predict_diab2[predict2 >= 0.5] = "yes"
+actual = testing$Diabetic
+table(predict_diab2, actual)
+```
+
+```{r}
+# Misclassification rate
+mean(predict_diab2 != actual)
+```
+
+We find that the misclassification rate from removing "Age" in Model 2 is higher than the misclassification rate from Model 1 (`r mean(predict_diab2 != actual)` vs `r mean(predict_diab1 != actual)` respectively). Based on this, and the fact that "Age" in Model 1 showed some significance based on the p-values, we will opt to go forward with Model 1.
+
+Based on the Model 1 p-values and an alpha of 0.05, we find that Age, Family_Diabetes, PhysicallyActive, Smoking, SoundSleep, RegularMedicine, BPLevel, and Pdiabetes seem to be the most significant variables. We can try running the regression again using only these variables.
+
+```{r}
+# Perform logistic regression on training set with reduced variables
+model3 = glm(factor(Diabetic) ~ Age+Family_Diabetes+PhysicallyActive+Smoking
+             +SoundSleep+RegularMedicine+BPLevel+Pdiabetes, 
+             family = binomial, data = training)
+summary(model3)
+```
+
+
+```{r}
+# Apply model to testing data
+predict3 = predict(model3, testing, type = "response")
+predict_diab3 = rep("no", dim(testing)[1])
+predict_diab3[predict3 >= 0.5] = "yes"
+actual = testing$Diabetic
+table(predict_diab3, actual)
+```
+
+```{r}
+# Misclassification rate
+mean(predict_diab3 != actual)
+```
+We see that the misclassification rate from Model 3 is the same as from Model 1.
+
+## 4.2 Linear Discriminant Analysis (LDA)
+
+Before we perform LDA, let us check the assumption of normality of the quantitative variables using QQ-plots and the Shapiro-Wilk test. 
+
+```{r}
+# Normality assumption check
+diabetic_yes = subset(data, Diabetic == "yes")
+diabetic_no = subset(data, Diabetic == "no")
+
+variable = c("BMI","Sleep","SoundSleep","Pregancies")
+
+par(mfrow = c(2,2))
+
+# QQ plots "yes" group
+for (i in variable){
+  
+  qqnorm(diabetic_yes[[i]]); qqline(diabetic_yes[[i]], col=2)
+}
+
+# QQ plots "no" group
+for (i in variable){
+  
+  qqnorm(diabetic_no[[i]]); qqline(diabetic_no[[i]], col=2)
+}
+```
+
+Each of these Q-Q plots corresponds to a different quantitative variable. The first set of four is for the "yes" response, while the second set is for the "no" response. For each set the order of the variables is : top left BMI, top right Sleep, bottom left SoundSleep, bottom right Pregnancies. "Pregnancies" does not appear to be normally distributed. "BMI" appears normally distributed for the "yes" group but may not be for the "no" group. "Sleep" and "SoundSleep" show a staircase pattern, which is probably due to the data being composed entirely of round, whole numbers. They otherwise appear normally distributed, but it is difficult to tell from these plots. We can perform the Shapiro-Wilk test on each of these variables as well.
+
+```{r}
+# Shapiro-Wilk tests
+
+# Diabetic "yes"
+shapiro.test(diabetic_yes$BMI)
+shapiro.test(diabetic_yes$Sleep)
+shapiro.test(diabetic_yes$SoundSleep)
+shapiro.test(diabetic_yes$Pregancies)
+
+# Diabetic "no"
+shapiro.test(diabetic_no$BMI)
+shapiro.test(diabetic_no$Sleep)
+shapiro.test(diabetic_no$SoundSleep)
+shapiro.test(diabetic_no$Pregancies)
+```
+
+None of the variables display a p-value greater than 0.05 in the Shapiro-Wilk test. Therefore, we cannot assume normality of the data. However, we will continue with the LDA and QDA regardless to see what result we get.
+
+```{r}
+# LDA on all predictors
+model_lda1 = lda(Diabetic ~ ., data = training)
+model_lda1
+```
+
+```{r}
+# Plot LDA model
+plot(model_lda1)
+```
+
+
+```{r}
+# Apply to testing set
+predict_lda1 = predict(model_lda1,testing)
+table(predict_lda1$class,testing$Diabetic)
+```
+
+```{r}
+# Misclassification rate
+mean(predict_lda1$class != testing$Diabetic)
+```
+
+We will also try performing LDA with the significant variables found during logistic regression.
+
+```{r}
+# LDA on significant predictors
+model_lda2 = lda(Diabetic ~ Age+Family_Diabetes+PhysicallyActive+Smoking
+                 +SoundSleep+RegularMedicine+BPLevel+Pdiabetes, data = training)
+model_lda2
+
+# Plot LDA model
+plot(model_lda2)
+
+# Apply to testing set
+predict_lda2 = predict(model_lda2,testing)
+table(predict_lda2$class,testing$Diabetic)
+
+# Misclassification rate
+mean(predict_lda2$class != testing$Diabetic)
+```
+
+The misclassification rate has lowered from `r mean(predict_lda1$class != testing$Diabetic)` to `r mean(predict_lda2$class != testing$Diabetic)`, suggesting the model is improved. We will note that this misclassification rate is the same as the full and reduced logistic regression models.
+
+## 4.3 Quadratic Discriminant Analysis (QDA)
+
+QDA does not work on factorized variables, so we must create a new data frame, converting all qualitative data to numeric codes. The procedure is then the same as LDA, using the QDA function.
+
+```{r}
+# Create new dataframes without factors
+## Convert characters to numeric
+data_qda = data.frame(data.matrix(data))
+
+# Split into training and testing sets
+set.seed(10)
+idx = sample(1:nrow(data_qda), 3/4*nrow(data_qda))
+train_qda = data_qda[idx,]
+test_qda = data_qda[-idx,]
+
+# QDA on all predictors
+model_qda1 = qda(Diabetic ~ ., data = train_qda)
+model_qda1
+
+# Apply to test set
+predict_qda1 = predict(model_qda1,test_qda)
+table(predict_qda1$class,test_qda$Diabetic)
+
+# Misclassification rate
+mean(predict_qda1$class != test_qda$Diabetic)
+```
+
+We will also perform QDA using only the significant variables from logistic regression and check the performance.
+
+```{r}
+# QDA on significant predictors
+model_qda2 = qda(Diabetic ~ Age+Family_Diabetes+PhysicallyActive+Smoking
+                 +SoundSleep+RegularMedicine+BPLevel+Pdiabetes, data = train_qda)
+model_qda2
+
+# Apply to test set
+predict_qda2 = predict(model_qda2,test_qda)
+table(predict_qda2$class,test_qda$Diabetic)
+
+# Misclassification rate
+mean(predict_qda2$class != test_qda$Diabetic)
+```
+
+The misclassification rate has lowered from `r mean(predict_qda1$class != test_qda$Diabetic)` to `r mean(predict_qda2$class != test_qda$Diabetic)`, suggesting improved model performance. Again, we will note that this is the same misclassification rate as the reduced LDA and logistic regression, as well as the full logistic regression.
+
+## 4.4 Classification Tree Model
+
+Creating a sample with 75% trained data and 25% test data, we have
+```{r echo=TRUE}
+library(tree)
+library(MASS)
+set.seed (10)
+train=sample(1:nrow(data),3/4*nrow(data))
+test=data[-train,]
+
+```
+
+
+The classification tree model fitted on the training data is given below:
+```{r echo=TRUE}
+tree_class<-tree(factor(Diabetic)~factor(Age)+factor(Gender)+factor(Family_Diabetes)+factor(highBP)+factor(PhysicallyActive)+BMI+factor(Smoking)+factor(Alcohol)+Sleep+SoundSleep+factor(RegularMedicine)+factor(JunkFood)+factor(Stress)+factor(BPLevel)+Pregancies+Pdiabetes+factor(UriationFreq) ,data,subset=train)
+summary(tree_class)
+```
+From the above output it can be seen that the variables used for tree construction are RegularMedicine,Pdiabetes,JunkFood,SoundSleep,Age,PhysicallyActive,BPLevel,BMI,Stress,Alcohol,Family_Diabetes,Gender and HighBP.
+
+
+
+Plotting the above tree model we have,
+```{r echo=TRUE}
+plot(tree_class)
+text(tree_class)
+
+```
+Prediction the test data is given below:
+```{r echo=TRUE}
+set.seed(10)
+tree_class_pred<-predict(tree_class,test,type = "class")
+tb=table(tree_class_pred,test$Diabetic)
+print(tb)
+```
+
+The misclassification rate is calculated below:
+
+```{r echo=TRUE}
+library(caret)
+mis_class_Error=(1-(sum(diag(tb)))/nrow(test))
+paste("The missclassification rate is",mis_class_Error)
+
+```
+```{r}
+confusionMatrix(tree_class_pred, factor(test$Diabetic))
+```
+
+### 4.4.1 Pruning the classification tree by checking the cross validation error:
+
+From the above classification tree it can be seen that the tree has 23 terminal modes, which can create an over fitting issue and can also increase the complexity of our model.Therefore, we prune the tree and try to find  the best number of terminal nodes using the cross validation error.
+
+```{r echo=TRUE}
+set.seed(10)
+cv_class<-cv.tree(tree_class, FUN = prune.misclass) 
+plot(cv_class$size, cv_class$dev,type="b")
+```
+From the above graph it can be seen that the cross-validation error is lowest when the number of terminal nodes are equal to 20 or greater, but in order to reduce the complexity of our model,we wish to take 10 as the best number of terminal nodes.
+
+Finding the best tree using cross-validation result,
+
+```{r echo=TRUE}
+prune_class=prune.tree(tree_class,best=10)
+plot(prune_class)
+text(prune_class,pretty=0)
+```
+
+Prediction of test data on the pruned tree is as follows:
+```{r echo=TRUE}
+set.seed(10)
+prune_class_pred<-predict(prune_class,test,type = "class")
+prune_tb=table(prune_class_pred,test$Diabetic)
+print(prune_tb)
+
+
+```
+
+The misclassification error is calculated below:
+
+```{r echo=TRUE}
+mis_class_prune_Error=(1-(sum(diag(prune_tb)))/nrow(test))
+paste("The missclassification rate of pruned tree is",mis_class_prune_Error)
+print(confusionMatrix(prune_class_pred, factor(test$Diabetic)))
+```
+
+
+From the above output we can see that the misclassification error rate of pruned is slightly greater than the un pruned tree.Therefore,in this situation unpruned tree gives the better result.
+
+
+### 4.4.2 Performing stratified 10-fold cross validation on our classification tree model:
+
+
+We also wish to use stratified 10-fold cross validation to see whether it results in a better model or not.Therefore,the misclassification rate using stratified 10-fold cross validation is calculated below:
+
+
+```{r echo=TRUE}
+library(caret)
+
+#creating folds
+folds<-createFolds(factor(data$Diabetic), k=10)
+```
+
+
+```{r echo=TRUE}
+##function to calculate the mis classification error of each fold
+
+ms_class_tree=function(idx){
+  Train<-data[-idx,]
+  Test<-data[idx,]
+  fit_tree<-tree_class<-tree(factor(Diabetic)~factor(Age)+factor(Gender)+factor(Family_Diabetes)+factor(highBP)+factor(PhysicallyActive)+BMI+factor(Smoking)+factor(Alcohol)+Sleep+SoundSleep+factor(RegularMedicine)+factor(JunkFood)+factor(Stress)+factor(BPLevel)+Pregancies+Pdiabetes+factor(UriationFreq) ,data=Train)
+  pred_tree<-predict(fit_tree,Test,type="class")
+  tb_tree=table(pred_tree,Test$Diabetic)
+  mis_class_Error=(1-(sum(diag(tb_tree)))/nrow(Test))
+  acc=sum(diag(tb_tree))/nrow(Test)
+  res=c(mis_class_Error,acc)
+  return(res)
+}
+
+```
+
+
+
+Calculating the cross-validation error,i.e the avg of misclassification rate of all the folds,we have,
+```{r echo=TRUE}
+res=as.data.frame(lapply(folds,ms_class_tree))
+
+#avg of misclassification rate
+cv_err_tree=mean(as.numeric(res[1,]))
+paste("The cross-validation error of classification tree model using stratified 10-fold cv:",cv_err_tree )
+
+#accuracy of the model
+acc=mean(as.numeric(res[2,]))
+paste("The accuracy of the model is:",acc)
+```
+From all the above output,we conclude that our classification tree has the lowest misclassification rate when no tree pruning technique or cross-validation step is performed.Therefore,in this case the unpruned tree is a better prediction tree model.
+
+## 4.5 Random Forest Model
+
+While researching about the different techniques, I found out that random forest method is also one of the Supervised Machine Learning Algorithm that is used widely in Classification and Regression problems. It builds decision trees on different samples and takes their majority vote for classification and average in case of regression. 
+The decision tree algorithm is quite easy to understand and interpret. But often, a single tree is not sufficient for producing effective results. This is where the Random Forest algorithm comes into the picture.
+It generally outperforms decision trees, so we thought of giving it a try.
+
+
+```{r}
+set.seed(123)
+library(randomForest)
+```
+Here we have applied random forest method to our training set. 
+Splitting the dataset into 75% training, 25% test. 
+
+```{r, echo = FALSE, message = FALSE }
+set.seed(10)
+sample = sample.split(df, SplitRatio = 0.75) 
+train_srs = subset(df, sample == TRUE) 
+test_srs = subset(df, sample == FALSE)
+```
+
+Applying the Random forest method on the training dataset.
+
+```{r}
+RF_model <- randomForest(Diabetic~.,
+        data=train_srs,
+        importance=TRUE,
+        prOximity=TRUE,
+        na.action=na.roughfix)
+RF_model
+```
+The misclassification error of training set came out to be 3.5% for n=500 trees, which is a default value.
+
+
+```{r}
+RF_model$confusion
+```
+
+
+```{r}
+RF_model <- randomForest(Diabetic~.,
+        data=train_srs,
+        ntree= 1000,
+        importance=TRUE,
+        prOximity=TRUE,
+        na.action=na.roughfix)
+RF_model
+```
+
+The misclassification error of training set came out to be also 3.5% for n=1000 trees. There by implying no change with increase in number of trees.
+
+```{r}
+oob.error.rate <- data.frame(
+Trees=rep(1:nrow(RF_model$err.rate), times=3),
+Type = rep(c("OOB", 'no', 'yes'), each=nrow(RF_model$err.rate)),
+Error = c(RF_model$err.rate[, "OOB"],
+RF_model$err.rate[, 'no'],
+RF_model$err.rate[, 'yes']
+))
+
+ggplot(data=oob.error.rate, aes(x=Trees, y=Error))+
+geom_line(aes(color=Type))+
+xlab('Number of Trees')+
+ylab('Error_rate')+
+ggtitle('Error Rate')
+```
+In order to analyse the optimum value of n we plotted a line graph for error rate with n varying upto 1000, and it is clearly visible that if we increase the number of n, any significant change in error is not noticeable. 
+
+
+
+```{r}
+RF.pred <- predict(RF_model, test_srs)
+confusionMatrix(RF.pred, test_srs$Diabetic)
+```
+
+The training model obtained was fitted to predict the test set and analysed for confusion matrix. The accuracy is this case came out to be 94.32% which seems to be quite good.
+
+
+# 5 Conclusion 
+
+Here we have tried to summarize the misclassification rate and accuracy for all the models we applied to analyze the dataset.
+
+
+     Model	          Misclassification Rate	    Accuracy
+Logistic Regression	              11.3%	             88.7%
+Linear Discrimination Analysis    11.3%	             88.7%
+Quadratic Discrimination Analysis	11.3%	             88.7%
+Classification Tree
+●	Unpruned tree                  8.82%             91.18%  
+●	Pruned tree                   12.18%             87.82%    
+●	Stratified k-fold CV          12.52%             87.48% 	
+
+Random Forest               	   3.5%	             94.32%
+
+And found that random forest method outperformed the rest.
+
+
+# 6 Future work
+We got quite good results with the models, we can compare them with other classification methods like Multinomial Regression
+Support Vector Machine (SVM), Naïve based (NB) or K- Nearest Neighbor Classifier, Comparison with other big datasets.
+We can also to validate our results with other big databases.
+
+
+# 7 Work Distribution
+
+Maya - Introduction, Purpose, dataset, methodology, General dataset exploration
+
+Shubham - Test of Independence (Chi-square test) 
+
+Jessica - Data cleanup, Logistic regression, LDA, QDA
+
+Harman - Classification tree model, K fold validation, 
+
+Nidhika - Randomforest Model, Report merging
+
+Conclusion - by All Team members 
+○	Model comparison (best model) 
+○	Summary of findings (parameters that are most correlated etc)
+
+
+# 8 References
+Canada, P. H. A. of. (2019, November 25). Government of Canada. Canada.ca. Retrieved February 12, 2022, from https://www.canada.ca/en/public-health/services/diseases/type-2-diabetes.html 
+
+World Health Organization. (2021, November 10). Diabetes. World Health Organization. Retrieved February 12, 2022, from https://www.who.int/news-room/fact-sheets/detail/diabetes  
+
+Tigga, Neha Prerna, and Shruti Garg. "Prediction of type 2 diabetes using machine learning classification methods." Procedia Computer Science 167 (2020): 706-716.
+
+Agresti, Alan. Categorical data analysis. John Wiley & Sons, 2003.
+James, Gareth, et al. An introduction to statistical learning. Vol. 112. New York: springer, 2013.
+
+What is a Random Forest?, https://www.tibco.com/reference-center/what-is-a-random-forest
+
+Lecture Notes - Data 606 by Dr Wenjun Jiang
+
+
